@@ -46,8 +46,8 @@ from werkzeug.security import check_password_hash, generate_password_hash
 # PYDROID / PHONE USERS: sirf neeche ki 4 values badlein.
 # Railway par environment variables bhi automatically work karenge.
 # ---------------------------------------------------------
-DIRECT_BOT_TOKEN = "PASTE_YOUR_BOT_TOKEN_HERE"
-DIRECT_ADMIN_TELEGRAM_ID = 0
+DIRECT_BOT_TOKEN = "8927578349:AAGCIVq7Y69f3U65U18SWz-8cEtaKPyCYSU"
+DIRECT_ADMIN_TELEGRAM_ID = 6923608671
 DIRECT_ADMIN_USERNAME = "admin"
 DIRECT_ADMIN_PASSWORD = "Admin@12345"
 
