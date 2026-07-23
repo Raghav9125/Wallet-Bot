@@ -726,7 +726,14 @@ def application_action_keyboard(application_id, application_code):
             ]
         )
 
-    rows.append([[InlineKeyboardButton("💬 Chat With Support", callback_data=f"chat_support_{application_id}")]])
+    rows.append(
+    [
+        InlineKeyboardButton(
+            "💬 Chat With Support",
+            callback_data=f"chat_support_{application_id}",
+        )
+    ]
+)
 
     rows.append(
         [
