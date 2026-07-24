@@ -7,6 +7,7 @@ def admin_menu() -> InlineKeyboardMarkup:
         [InlineKeyboardButton('🖼 Welcome Image', callback_data='admin:set:welcome_image')],
         [InlineKeyboardButton('💳 Payment Settings', callback_data='admin:payments')],
         [InlineKeyboardButton('🔗 WhatsApp Link', callback_data='admin:set:whatsapp'), InlineKeyboardButton('📢 Channel Link', callback_data='admin:set:channel')],
+        [InlineKeyboardButton('📧 Support Email', callback_data='admin:set:support_email')],
         [InlineKeyboardButton('📈 Statistics', callback_data='admin:stats')],
     ])
 

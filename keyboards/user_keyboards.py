@@ -1,3 +1,5 @@
+from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
+
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 def main_menu(channel_link: str) -> InlineKeyboardMarkup:
@@ -23,8 +25,43 @@ def understood_menu(code:str) -> InlineKeyboardMarkup:
         [InlineKeyboardButton('⬅️ Back', callback_data='user:apply')],
     ])
 
-def whatsapp_button(link:str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[InlineKeyboardButton('💬 Contact Directly on WhatsApp', url=link)]])
+def whatsapp_button(link: str, message: str | None = None) -> InlineKeyboardMarkup:
+    final_link = (link or "https://wa.me/").strip()
+    if message:
+        parts = urlsplit(final_link)
+        query = dict(parse_qsl(parts.query, keep_blank_values=True))
+        query["text"] = message
+        final_link = urlunsplit(
+            (
+                parts.scheme or "https",
+                parts.netloc,
+                parts.path,
+                urlencode(query),
+                parts.fragment,
+            )
+        )
+    return InlineKeyboardMarkup(
+        [[InlineKeyboardButton("💬 Contact Directly on WhatsApp", url=final_link)]]
+    )
+
+
+def support_contact_buttons(whatsapp_link: str, support_email: str) -> InlineKeyboardMarkup:
+    email = (support_email or "").strip()
+    rows = [
+        [InlineKeyboardButton("💬 Contact Directly on WhatsApp", url=whatsapp_link)]
+    ]
+    if email and email.lower() != "not set":
+        subject = quote("India Business Wallet Support")
+        body = quote("Hello, I need help with India Business Wallet services.")
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    "📧 Contact Support by Email",
+                    url=f"mailto:{email}?subject={subject}&body={body}",
+                )
+            ]
+        )
+    return InlineKeyboardMarkup(rows)
 
 def cancel_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([[InlineKeyboardButton('❌ Cancel', callback_data='user:cancel')]])
