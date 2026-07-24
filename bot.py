@@ -78,6 +78,21 @@ def build_application() -> Application:
     app.add_handler(user_conversation)
     app.add_handler(admin_conversation)
 
+    # Open the main dashboard when a user sends any supported keyword.
+    open_keywords_pattern = (
+        r"(?i)^\s*(?:"
+        r"open|open\s+krwana\s+hai|open\s+karwana\s+hai|"
+        r"business\s+wallet|bharat\s*pay|bharatpe|"
+        r"paytm\s+business|bot|hi|hlo|hello"
+        r")\s*[!.?]*\s*$"
+    )
+    app.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND & filters.Regex(open_keywords_pattern),
+            user.start,
+        )
+    )
+
     app.add_handler(
         CallbackQueryHandler(
             user.callback_router,
