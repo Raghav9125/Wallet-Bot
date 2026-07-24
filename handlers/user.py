@@ -83,13 +83,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         availability_text = "🌙 <b>Come Back Again Tomorrow at 10:00 AM</b>"
 
     text = (
-        f"👋 <b>Hello {first_name}!</b>\n\n"
-        "🎉 <b>Welcome to India Business Wallets</b>\n\n"
-        "💳 Business Wallet Services\n"
-        "📝 Apply Now & Track Status\n"
-        "🕙 <b>Business Working Time:</b> 10:00 AM to 9:30 PM\n"
+        f"👋 <b>Hello {first_name}!</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
+        "🎉 <b>India Business Wallets</b>\n\n"
+        "💳 <b>Business Wallet Services</b>\n"
+        "📝 Apply Now & Track Status\n\n"
+        "🕙 <b>Working Hours</b>\n"
+        "10:00 AM – 9:30 PM\n\n"
         f"{availability_text}\n"
-        f"📅 <b>Date:</b> {current_date}\n\n"
+        f"📅 <b>{current_date}</b>\n"
+        "━━━━━━━━━━━━━━━━━━\n"
         "Neeche diye gaye button se service select karein 👇"
     )
     if update.callback_query:
