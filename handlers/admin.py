@@ -19,7 +19,18 @@ async def admin_callback(update,context):
     q=update.callback_query; await q.answer()
     if not _is_admin(update,context): await q.answer('Admin access required.',show_alert=True); return ConversationHandler.END
     db=_db(context); data=q.data or ''
-    if data=='admin:home': await q.edit_message_text('🛠 <b>India Business Wallet Admin Panel</b>',parse_mode=ParseMode.HTML,reply_markup=admin_menu()); return ConversationHandler.END
+    if data == 'admin:home':
+        try:
+            await q.delete_message()
+        except Exception:
+            pass
+        await context.bot.send_message(
+            chat_id=q.message.chat_id,
+            text='🛠 <b>India Business Wallet Admin Panel</b>',
+            parse_mode=ParseMode.HTML,
+            reply_markup=admin_menu(),
+        )
+        return ConversationHandler.END
     if data=='admin:stats':
         s=db.stats(); await q.edit_message_text(f"📈 <b>Statistics</b>\n\nTotal: {s['total']}\nPending: {s['pending']}\nSuccessful: {s['success']}\nRejected: {s['rejected']}",parse_mode=ParseMode.HTML,reply_markup=admin_menu()); return ConversationHandler.END
     if data=='admin:prices': await q.edit_message_text('💰 Select service:',reply_markup=price_services_menu(db.list_services(False))); return ConversationHandler.END
@@ -114,13 +125,6 @@ async def admin_callback(update,context):
                 f"✅ Final payment request sent for {app_no}.",
             )
         return ConversationHandler.END
-        qr=db.get_setting(f"final_qr_{app['service_code']}")
-        if not qr:
-            await context.bot.send_message(
-                q.message.chat_id,
-                '⚠️ Pehle is wallet ka Final Payment QR admin panel se set karein.'
-            )
-            return ConversationHandler.END
         db.request_final_payment(app_no); app=db.get_application(app_no)
         msg=(f"🎉 <b>Your Business Wallet Service Is Ready</b>\n\nApplication ID: <code>{app_no}</code>\nService: {html.escape(app['service_name'])}\n\nTotal Service Charge: ₹{app['amount']}\nFirst Payment Paid: ₹{app['first_amount']}\nFinal Payment Due: ₹{app['remaining_amount']}\n\nTap below to complete the final payment.")
         try: await context.bot.send_message(app['user_id'],msg,parse_mode=ParseMode.HTML,reply_markup=final_payment_button(app_no))
@@ -150,8 +154,6 @@ async def admin_callback(update,context):
                 q.message.chat_id,
                 f"✅ {app_no} status updated: {STATUS_LABELS.get(status, status)}",
             )
-        return ConversationHandler.END
-        db.update_status(app_no,status); await notify_user(context,app['user_id'],app_no,status,None); await q.answer('Status updated.',show_alert=True)
         return ConversationHandler.END
     return ConversationHandler.END
 
@@ -201,8 +203,30 @@ async def receive_reject(update,context):
     if app: db.update_status(app_no,'REJECTED',reason); await notify_user(context,app['user_id'],app_no,'REJECTED',reason)
     context.user_data.clear(); await update.message.reply_text('❌ Rejected and user notified.',reply_markup=admin_menu()); return ConversationHandler.END
 
-async def notify_user(context,user_id,app_no,status,note):
-    text=f"📢 <b>Application Status Updated</b>\n\nApplication ID: <code>{html.escape(app_no)}</code>\nStatus: {STATUS_LABELS.get(status,status)}"
-    if note: text += f"\nReason: {html.escape(note)}"
-    try: await context.bot.send_message(user_id,text,parse_mode=ParseMode.HTML)
-    except Exception: pass
+async def notify_user(context, user_id, app_no, status, note):
+    if status == 'SUCCESS':
+        text = (
+            "🎉 <b>Your Service Has Been Completed Successfully!</b>\n\n"
+            f"Application ID: <code>{html.escape(app_no)}</code>\n"
+            "Status: ✅ Service Successfully Completed\n\n"
+            "Thank you for choosing <b>India Business Wallets</b>.\n"
+            "We truly appreciate your trust in our service.\n\n"
+            "🌟 Have a wonderful and successful day!"
+        )
+    else:
+        text = (
+            "📢 <b>Application Status Updated</b>\n\n"
+            f"Application ID: <code>{html.escape(app_no)}</code>\n"
+            f"Status: {STATUS_LABELS.get(status, status)}"
+        )
+        if note:
+            text += f"\nReason: {html.escape(note)}"
+
+    try:
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=text,
+            parse_mode=ParseMode.HTML,
+        )
+    except Exception:
+        pass
