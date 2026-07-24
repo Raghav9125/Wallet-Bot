@@ -38,6 +38,32 @@ def _db(context: ContextTypes.DEFAULT_TYPE) -> Database:
     return context.application.bot_data["db"]
 
 
+async def _replace_callback_message(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    text: str,
+    *,
+    reply_markup=None,
+    parse_mode=None,
+) -> None:
+    """Safely replace either a text message or a photo/caption message."""
+    query = update.callback_query
+    if not query or not query.message:
+        return
+
+    try:
+        await query.delete_message()
+    except Exception:
+        pass
+
+    await context.bot.send_message(
+        chat_id=query.message.chat_id,
+        text=text,
+        parse_mode=parse_mode,
+        reply_markup=reply_markup,
+    )
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     db = _db(context)
     channel = db.get_setting("channel_link", "https://t.me/")
@@ -81,7 +107,9 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "user:apply":
         services = db.list_services(active_only=False)
-        await query.edit_message_text(
+        await _replace_callback_message(
+            update,
+            context,
             "💼 <b>Aap kaunsa Business Wallet open karna chahte hain?</b>",
             parse_mode=ParseMode.HTML,
             reply_markup=services_menu(services),
@@ -91,7 +119,9 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "user:support":
         link = db.get_setting("whatsapp_link", "https://wa.me/")
         support_text = html.escape(db.get_setting("support_text"))
-        await query.edit_message_text(
+        await _replace_callback_message(
+            update,
+            context,
             f"💬 <b>Support</b>\n\n{support_text}",
             parse_mode=ParseMode.HTML,
             reply_markup=whatsapp_button(link),
@@ -101,7 +131,9 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "user:status":
         apps = db.get_user_applications(query.from_user.id)
         if not apps:
-            await query.edit_message_text(
+            await _replace_callback_message(
+                update,
+                context,
                 "Aapki koi application nahi mili.",
                 reply_markup=main_menu(db.get_setting("channel_link")),
             )
@@ -115,7 +147,9 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"Amount: ₹{app['amount']}\n"
                 f"Status: {status}\n"
             )
-        await query.edit_message_text(
+        await _replace_callback_message(
+            update,
+            context,
             "\n".join(lines),
             parse_mode=ParseMode.HTML,
             reply_markup=main_menu(db.get_setting("channel_link")),
@@ -126,7 +160,7 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         code = data.split(":", 1)[1]
         service = db.get_service(code)
         if not service:
-            await query.edit_message_text("Service nahi mili.")
+            await _replace_callback_message(update, context, "Service nahi mili.")
             return
         if not service["active"]:
             await query.edit_message_text(
@@ -137,7 +171,9 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         docs = GOOGLE_DOCS if code == "google_pay" else COMMON_DOCS
         doc_text = "\n".join(f"• {html.escape(item)}" for item in docs)
-        await query.edit_message_text(
+        await _replace_callback_message(
+            update,
+            context,
             f"💳 <b>{html.escape(service['name'])}</b>\n\n"
             f"<b>Required Documents:</b>\n{doc_text}\n\n"
             f"<b>Service Charge:</b> ₹{service['price']}\n\n"
