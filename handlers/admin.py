@@ -57,10 +57,70 @@ async def admin_callback(update,context):
             await context.bot.send_photo(q.message.chat_id,photo,caption=cap,parse_mode=ParseMode.HTML,reply_markup=application_actions(a['application_no'],a['status']))
         return ConversationHandler.END
     if data.startswith('admin:requestfinal:'):
-        app_no=data.split(':',2)[2]; app=db.get_application(app_no)
-        if not app: await q.answer('Application not found.',show_alert=True); return ConversationHandler.END
+        app_no = data.split(':', 2)[2]
+        app = db.get_application(app_no)
+        if not app:
+            await context.bot.send_message(q.message.chat_id, '❌ Application not found.')
+            return ConversationHandler.END
+
+        qr = db.get_setting(f"final_qr_{app['service_code']}")
+        if not qr:
+            await context.bot.send_message(
+                q.message.chat_id,
+                '⚠️ Pehle is wallet ka Final Payment QR admin panel se set karein.'
+            )
+            return ConversationHandler.END
+
+        db.request_final_payment(app_no)
+        app = db.get_application(app_no)
+
+        msg = (
+            "🎉 <b>Your Business Wallet Service Is Ready</b>\n\n"
+            f"Application ID: <code>{html.escape(app_no)}</code>\n"
+            f"Service: {html.escape(app['service_name'])}\n\n"
+            f"Total Service Charge: ₹{app['amount']}\n"
+            f"First Payment Paid: ₹{app['first_amount']}\n"
+            f"Final Payment Due: ₹{app['remaining_amount']}\n\n"
+            "Tap below to complete the final payment."
+        )
+
+        try:
+            await context.bot.send_message(
+                app['user_id'],
+                msg,
+                parse_mode=ParseMode.HTML,
+                reply_markup=final_payment_button(app_no),
+            )
+        except Exception as exc:
+            await context.bot.send_message(
+                q.message.chat_id,
+                f"⚠️ Status update hua, lekin user ko notification nahi bhej paaya: {html.escape(str(exc))}",
+                parse_mode=ParseMode.HTML,
+            )
+
+        new_caption = _updated_caption_status(
+            q.message.caption or '',
+            'FINAL_PAYMENT_REQUESTED',
+        )
+        try:
+            await q.edit_message_caption(
+                caption=new_caption,
+                parse_mode=ParseMode.HTML,
+                reply_markup=application_actions(app_no, 'FINAL_PAYMENT_REQUESTED'),
+            )
+        except Exception:
+            await context.bot.send_message(
+                q.message.chat_id,
+                f"✅ Final payment request sent for {app_no}.",
+            )
+        return ConversationHandler.END
         qr=db.get_setting(f"final_qr_{app['service_code']}")
-        if not qr: await q.answer('Set this wallet’s Final Payment QR first.',show_alert=True); return ConversationHandler.END
+        if not qr:
+            await context.bot.send_message(
+                q.message.chat_id,
+                '⚠️ Pehle is wallet ka Final Payment QR admin panel se set karein.'
+            )
+            return ConversationHandler.END
         db.request_final_payment(app_no); app=db.get_application(app_no)
         msg=(f"🎉 <b>Your Business Wallet Service Is Ready</b>\n\nApplication ID: <code>{app_no}</code>\nService: {html.escape(app['service_name'])}\n\nTotal Service Charge: ₹{app['amount']}\nFirst Payment Paid: ₹{app['first_amount']}\nFinal Payment Due: ₹{app['remaining_amount']}\n\nTap below to complete the final payment.")
         try: await context.bot.send_message(app['user_id'],msg,parse_mode=ParseMode.HTML,reply_markup=final_payment_button(app_no))
@@ -69,11 +129,45 @@ async def admin_callback(update,context):
     if data.startswith('admin:reject:'):
         context.user_data.update(admin_action='reject',application_no=data.split(':',2)[2]); await q.edit_message_caption(caption=(q.message.caption or '')+'\n\nSend rejection reason.'); return WAITING_REJECT
     if data.startswith('admin:status:'):
-        _,_,app_no,status=data.split(':',3); app=db.get_application(app_no)
-        if not app: await q.answer('Application not found.',show_alert=True); return ConversationHandler.END
+        _, _, app_no, status = data.split(':', 3)
+        app = db.get_application(app_no)
+        if not app:
+            await context.bot.send_message(q.message.chat_id, '❌ Application not found.')
+            return ConversationHandler.END
+
+        db.update_status(app_no, status)
+        await notify_user(context, app['user_id'], app_no, status, None)
+
+        new_caption = _updated_caption_status(q.message.caption or '', status)
+        try:
+            await q.edit_message_caption(
+                caption=new_caption,
+                parse_mode=ParseMode.HTML,
+                reply_markup=application_actions(app_no, status),
+            )
+        except Exception:
+            await context.bot.send_message(
+                q.message.chat_id,
+                f"✅ {app_no} status updated: {STATUS_LABELS.get(status, status)}",
+            )
+        return ConversationHandler.END
         db.update_status(app_no,status); await notify_user(context,app['user_id'],app_no,status,None); await q.answer('Status updated.',show_alert=True)
         return ConversationHandler.END
     return ConversationHandler.END
+
+
+def _updated_caption_status(caption: str, status: str) -> str:
+    """Replace or append the Status line while preserving the admin card."""
+    new_status = f"Status: {STATUS_LABELS.get(status, status)}"
+    lines = caption.splitlines()
+    for index, line in enumerate(lines):
+        if line.startswith("Status:"):
+            lines[index] = new_status
+            break
+    else:
+        lines.append(new_status)
+    return "\n".join(lines)
+
 
 async def receive_setting(update,context):
     if not _is_admin(update,context): return ConversationHandler.END
