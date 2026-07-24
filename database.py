@@ -90,6 +90,7 @@ class Database:
                 "upi_id": "Not set",
                 "payment_name": "India Business Wallet",
                 "qr_file_id": "",
+                "welcome_image_file_id": "",
                 "support_text": "Hamari support team se WhatsApp par sampark karein.",
             }
             for key, value in defaults.items():
@@ -121,11 +122,20 @@ class Database:
         with self.connect() as conn:
             return conn.execute(query).fetchall()
 
-    def get_service(self, code: str):
+    def get_service(self, code: str, active_only: bool = False):
         with self.connect() as conn:
-            return conn.execute(
-                "SELECT * FROM services WHERE code = ? AND active = 1", (code,)
-            ).fetchone()
+            query = "SELECT * FROM services WHERE code = ?"
+            if active_only:
+                query += " AND active = 1"
+            return conn.execute(query, (code,)).fetchone()
+
+    def set_service_active(self, code: str, active: bool) -> bool:
+        with self.connect() as conn:
+            cur = conn.execute(
+                "UPDATE services SET active = ? WHERE code = ?",
+                (1 if active else 0, code),
+            )
+            return cur.rowcount > 0
 
     def update_service_price(self, code: str, price: int) -> bool:
         with self.connect() as conn:
@@ -250,4 +260,4 @@ class Database:
                 "pending": pending,
                 "success": success,
                 "rejected": rejected,
-            }
+                                 }
