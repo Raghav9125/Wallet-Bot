@@ -92,7 +92,8 @@ class Database:
                 'whatsapp_link': 'https://wa.me/',
                 'channel_link': 'https://t.me/',
                 'welcome_image_file_id': '',
-                'support_text': 'Hamari support team se WhatsApp par sampark karein.',
+                'support_text': 'Hamari support team se WhatsApp ya Email par sampark karein.',
+                'support_email': 'support@example.com',
                 'first_payment_qr_file_id': '',
                 'first_payment_banking_name': 'India Business Wallet',
             }
