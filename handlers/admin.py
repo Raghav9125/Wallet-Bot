@@ -7,6 +7,7 @@ from database import Database
 from keyboards.admin_keyboards import (
     admin_menu,
     application_actions,
+    availability_services_menu,
     price_services_menu,
 )
 from utils.constants import STATUS_LABELS
@@ -24,10 +25,10 @@ def _is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
 
 async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not _is_admin(update, context):
-        await update.message.reply_text("⛔ Aap admin nahi hain.")
+        await update.message.reply_text("â›” Aap admin nahi hain.")
         return
     await update.message.reply_text(
-        "🛠 <b>India Business Wallet Admin Panel</b>",
+        "ðŸ›  <b>India Business Wallet Admin Panel</b>",
         parse_mode=ParseMode.HTML,
         reply_markup=admin_menu(),
     )
@@ -45,7 +46,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "admin:home":
         await query.edit_message_text(
-            "🛠 <b>India Business Wallet Admin Panel</b>",
+            "ðŸ›  <b>India Business Wallet Admin Panel</b>",
             parse_mode=ParseMode.HTML,
             reply_markup=admin_menu(),
         )
@@ -54,7 +55,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "admin:stats":
         s = db.stats()
         await query.edit_message_text(
-            "📈 <b>Application Statistics</b>\n\n"
+            "ðŸ“ˆ <b>Application Statistics</b>\n\n"
             f"Total: {s['total']}\n"
             f"Pending: {s['pending']}\n"
             f"Successful: {s['success']}\n"
@@ -66,8 +67,32 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "admin:prices":
         await query.edit_message_text(
-            "💰 Price change karne ke liye service select karein:",
+            "ðŸ’° Price change karne ke liye service select karein:",
             reply_markup=price_services_menu(db.list_services(active_only=False)),
+        )
+        return ConversationHandler.END
+
+    if data == "admin:availability":
+        await query.edit_message_text(
+            "ðŸŸ¢ <b>Service Availability</b>\n\nStatus badalne ke liye service par tap karein.",
+            parse_mode=ParseMode.HTML,
+            reply_markup=availability_services_menu(db.list_services(active_only=False)),
+        )
+        return ConversationHandler.END
+
+    if data.startswith("admin:toggle:"):
+        code = data.split(":", 2)[2]
+        service = db.get_service(code)
+        if not service:
+            await query.answer("Service nahi mili.", show_alert=True)
+            return ConversationHandler.END
+        new_active = not bool(service["active"])
+        db.set_service_active(code, new_active)
+        await query.answer("Status updated.", show_alert=True)
+        await query.edit_message_text(
+            "ðŸŸ¢ <b>Service Availability</b>\n\nStatus badalne ke liye service par tap karein.",
+            parse_mode=ParseMode.HTML,
+            reply_markup=availability_services_menu(db.list_services(active_only=False)),
         )
         return ConversationHandler.END
 
@@ -90,6 +115,11 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("Naya payment QR code photo ke roop me bhejein.")
         return WAITING_SETTING
 
+    if data == "admin:set:welcome_image":
+        context.user_data["admin_action"] = "welcome_image_file_id"
+        await query.edit_message_text("Nayi welcome image photo ke roop me bhejein.")
+        return WAITING_SETTING
+
     setting_map = {
         "admin:set:whatsapp": ("whatsapp_link", "Naya WhatsApp link bhejein, jaise https://wa.me/91XXXXXXXXXX"),
         "admin:set:channel": ("channel_link", "Naya Telegram channel link bhejein."),
@@ -109,7 +139,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("Koi application nahi mili.", reply_markup=admin_menu())
             return ConversationHandler.END
         await query.edit_message_text(
-            f"📋 {len(apps)} applications mili. Details alag messages me bheji ja rahi hain.",
+            f"ðŸ“‹ {len(apps)} applications mili. Details alag messages me bheji ja rahi hain.",
             reply_markup=admin_menu(),
         )
         for app in apps:
@@ -117,7 +147,7 @@ async def admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"<b>{html.escape(app['application_no'])}</b>\n"
                 f"User: {html.escape(app['full_name'])}\n"
                 f"Service: {html.escape(app['service_name'])}\n"
-                f"Amount: ₹{app['amount']}\n"
+                f"Amount: â‚¹{app['amount']}\n"
                 f"UTR: <code>{html.escape(app['utr'])}</code>\n"
                 f"Status: {STATUS_LABELS.get(app['status'], app['status'])}"
             )
@@ -179,12 +209,13 @@ async def receive_setting(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db = _db(context)
     action = context.user_data.get("admin_action")
 
-    if action == "qr_file_id":
+    if action in {"qr_file_id", "welcome_image_file_id"}:
         if not update.message.photo:
-            await update.message.reply_text("Kripya QR code photo bhejein.")
+            await update.message.reply_text("Kripya photo bhejein.")
             return WAITING_SETTING
-        db.set_setting("qr_file_id", update.message.photo[-1].file_id)
-        await update.message.reply_text("✅ Payment QR successfully updated.", reply_markup=admin_menu())
+        db.set_setting(action, update.message.photo[-1].file_id)
+        msg = "âœ… Payment QR successfully updated." if action == "qr_file_id" else "âœ… Welcome image successfully updated."
+        await update.message.reply_text(msg, reply_markup=admin_menu())
     else:
         value = (update.message.text or "").strip()
         if not value:
@@ -194,7 +225,7 @@ async def receive_setting(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("Valid link http:// ya https:// se shuru hona chahiye.")
             return WAITING_SETTING
         db.set_setting(action, value)
-        await update.message.reply_text("✅ Setting updated.", reply_markup=admin_menu())
+        await update.message.reply_text("âœ… Setting updated.", reply_markup=admin_menu())
 
     context.user_data.clear()
     return ConversationHandler.END
@@ -216,7 +247,7 @@ async def receive_price(update: Update, context: ContextTypes.DEFAULT_TYPE):
     code = context.user_data["service_code"]
     db.update_service_price(code, price)
     await update.message.reply_text(
-        f"✅ {context.user_data['service_name']} ka price ₹{price} set ho gaya.",
+        f"âœ… {context.user_data['service_name']} ka price â‚¹{price} set ho gaya.",
         reply_markup=admin_menu(),
     )
     context.user_data.clear()
@@ -241,14 +272,14 @@ async def receive_reject_reason(update: Update, context: ContextTypes.DEFAULT_TY
 
     db.update_application_status(app_no, "REJECTED", reason)
     await _notify_user_status(context, app["user_id"], app_no, "REJECTED", reason)
-    await update.message.reply_text("❌ Application rejected aur user ko inform kar diya gaya.", reply_markup=admin_menu())
+    await update.message.reply_text("âŒ Application rejected aur user ko inform kar diya gaya.", reply_markup=admin_menu())
     context.user_data.clear()
     return ConversationHandler.END
 
 
 async def _notify_user_status(context, user_id: int, app_no: str, status: str, note: str | None):
     text = (
-        "📢 <b>Application Status Updated</b>\n\n"
+        "ðŸ“¢ <b>Application Status Updated</b>\n\n"
         f"Application ID: <code>{html.escape(app_no)}</code>\n"
         f"Status: {STATUS_LABELS.get(status, status)}"
     )
