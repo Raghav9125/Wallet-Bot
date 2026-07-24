@@ -47,19 +47,39 @@ async def callback_router(update, context):
     if data=='user:home': await start(update,context); return
     if data=='user:apply':
         await _replace(update,context,'💼 <b>Aap kaunsa Business Wallet open karna chahte hain?</b>',services_menu(db.list_services(False)),ParseMode.HTML); return
-    if data=='user:support':
-        support_email = db.get_setting('support_email', 'support@example.com')
-        support_text = (
-            f"💬 <b>Support</b>\n\n"
-            f"{html.escape(db.get_setting('support_text'))}\n\n"
-            f"📧 <b>Email:</b> <code>{html.escape(support_email)}</code>"
+    if data == 'user:support':
+        support_email = db.get_setting(
+            'support_email',
+            'support@example.com',
         )
+        whatsapp_link = db.get_setting(
+            'whatsapp_link',
+            'https://wa.me/',
+        )
+        support_description = db.get_setting(
+            'support_text',
+            'Hamari support team se sampark karein.',
+        )
+
+        email_display = (
+            html.escape(support_email)
+            if support_email
+            else 'Not set'
+        )
+        support_text = (
+            "💬 <b>India Business Wallet Support</b>\n\n"
+            f"{html.escape(support_description)}\n\n"
+            f"📧 <b>Support Email:</b> "
+            f"<code>{email_display}</code>\n\n"
+            "Neeche diye gaye option se contact karein 👇"
+        )
+
         await _replace(
             update,
             context,
             support_text,
             support_contact_buttons(
-                db.get_setting('whatsapp_link'),
+                whatsapp_link,
                 support_email,
             ),
             ParseMode.HTML,
