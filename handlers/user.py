@@ -5,7 +5,7 @@ from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes, ConversationHandler
 from database import Database
-from keyboards.user_keyboards import main_menu, services_menu, understood_menu, whatsapp_button, cancel_keyboard
+from keyboards.user_keyboards import main_menu, services_menu, understood_menu, whatsapp_button, support_contact_buttons, cancel_keyboard
 from utils.constants import STATUS_LABELS
 from utils.validators import is_valid_utr, normalize_utr
 
@@ -48,7 +48,23 @@ async def callback_router(update, context):
     if data=='user:apply':
         await _replace(update,context,'💼 <b>Aap kaunsa Business Wallet open karna chahte hain?</b>',services_menu(db.list_services(False)),ParseMode.HTML); return
     if data=='user:support':
-        await _replace(update,context,f"💬 <b>Support</b>\n\n{html.escape(db.get_setting('support_text'))}",whatsapp_button(db.get_setting('whatsapp_link')),ParseMode.HTML); return
+        support_email = db.get_setting('support_email', 'support@example.com')
+        support_text = (
+            f"💬 <b>Support</b>\n\n"
+            f"{html.escape(db.get_setting('support_text'))}\n\n"
+            f"📧 <b>Email:</b> <code>{html.escape(support_email)}</code>"
+        )
+        await _replace(
+            update,
+            context,
+            support_text,
+            support_contact_buttons(
+                db.get_setting('whatsapp_link'),
+                support_email,
+            ),
+            ParseMode.HTML,
+        )
+        return
     if data=='user:status':
         apps=db.get_user_applications(q.from_user.id)
         if not apps: await _replace(update,context,'Aapki koi application nahi mili.',main_menu(db.get_setting('channel_link'))); return
@@ -103,7 +119,26 @@ async def receive_first_utr(update, context):
     if any(k not in context.user_data for k in req): context.user_data.clear(); await update.message.reply_text('Session expired. Send /start and try again.'); return ConversationHandler.END
     u=update.effective_user; app_no=db.create_application(user_id=u.id,full_name=u.full_name,username=u.username,service_code=context.user_data['service_code'],service_name=context.user_data['service_name'],amount=context.user_data['amount'],receipt_file_id=context.user_data['receipt_file_id'],utr=utr)
     app=db.get_application(app_no)
-    await update.message.reply_text(f"✅ <b>First Payment Submitted Successfully</b>\n\nApplication ID: <code>{app_no}</code>\nService: {html.escape(app['service_name'])}\nPaid Amount: ₹{app['first_amount']}\nRemaining Amount: ₹{app['remaining_amount']}\nStatus: {STATUS_LABELS['FIRST_PAYMENT_PENDING']}",parse_mode=ParseMode.HTML,reply_markup=whatsapp_button(db.get_setting('whatsapp_link')))
+    whatsapp_message = (
+        "Hello, I have submitted my first payment.\n\n"
+        f"Application ID: {app_no}\n"
+        f"Service: {app['service_name']}\n"
+        f"Paid Amount: ₹{app['first_amount']}\n\n"
+        "Please help me with the next process."
+    )
+    await update.message.reply_text(
+        f"✅ <b>First Payment Submitted Successfully</b>\n\n"
+        f"Application ID: <code>{app_no}</code>\n"
+        f"Service: {html.escape(app['service_name'])}\n"
+        f"Paid Amount: ₹{app['first_amount']}\n"
+        f"Remaining Amount: ₹{app['remaining_amount']}\n"
+        f"Status: {STATUS_LABELS['FIRST_PAYMENT_PENDING']}",
+        parse_mode=ParseMode.HTML,
+        reply_markup=whatsapp_button(
+            db.get_setting('whatsapp_link'),
+            whatsapp_message,
+        ),
+    )
     from keyboards.admin_keyboards import application_actions
     cap=(f"🆕 <b>New First Payment</b>\n\nApplication: <code>{app_no}</code>\nUser: {html.escape(u.full_name)}\nUser ID: <code>{u.id}</code>\nService: {html.escape(app['service_name'])}\nTotal: ₹{app['amount']}\nFirst Paid: ₹{app['first_amount']}\nUTR: <code>{utr}</code>\nStatus: {STATUS_LABELS['FIRST_PAYMENT_PENDING']}")
     for aid in context.application.bot_data['admin_ids']:

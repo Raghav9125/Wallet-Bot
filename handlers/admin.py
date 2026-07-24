@@ -34,7 +34,12 @@ async def admin_callback(update,context):
         code=data.split(':',2)[2]; s=db.get_service(code); context.user_data.update(admin_action='price',service_code=code,service_name=s['name']); await q.edit_message_text(f"Send new price for {s['name']} as a number."); return WAITING_PRICE
     photo_actions={'admin:set:welcome_image':'welcome_image_file_id','admin:set:first_qr':'first_payment_qr_file_id'}
     if data in photo_actions: context.user_data['admin_action']=photo_actions[data]; await q.edit_message_text('Send the new image as a Telegram photo.'); return WAITING_SETTING
-    text_actions={'admin:set:whatsapp':'whatsapp_link','admin:set:channel':'channel_link','admin:set:first_bank':'first_payment_banking_name'}
+    text_actions={
+        'admin:set:whatsapp':'whatsapp_link',
+        'admin:set:channel':'channel_link',
+        'admin:set:support_email':'support_email',
+        'admin:set:first_bank':'first_payment_banking_name',
+    }
     if data in text_actions: context.user_data['admin_action']=text_actions[data]; await q.edit_message_text('Send the new value as text.'); return WAITING_SETTING
     if data.startswith('admin:set:final_qr:'):
         code=data.rsplit(':',1)[1]; context.user_data['admin_action']=f'final_qr_{code}'; await q.edit_message_text('Send this wallet’s new Final Payment QR as a photo.'); return WAITING_SETTING
@@ -79,7 +84,12 @@ async def receive_setting(update,context):
     else:
         value=(update.message.text or '').strip()
         if not value: await update.message.reply_text('Value cannot be empty.'); return WAITING_SETTING
-        if action in {'whatsapp_link','channel_link'} and not value.startswith(('http://','https://')): await update.message.reply_text('Link must start with http:// or https://'); return WAITING_SETTING
+        if action in {'whatsapp_link','channel_link'} and not value.startswith(('http://','https://')):
+            await update.message.reply_text('Link must start with http:// or https://')
+            return WAITING_SETTING
+        if action == 'support_email' and ('@' not in value or '.' not in value.split('@')[-1]):
+            await update.message.reply_text('Please send a valid email address. Example: support@example.com')
+            return WAITING_SETTING
         db.set_setting(action,value)
     context.user_data.clear(); await update.message.reply_text('✅ Setting updated.',reply_markup=admin_menu()); return ConversationHandler.END
 
