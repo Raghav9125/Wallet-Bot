@@ -1,4 +1,6 @@
 import html
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes, ConversationHandler
@@ -69,11 +71,25 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     channel = db.get_setting("channel_link", "https://t.me/")
     image = db.get_setting("welcome_image_file_id", "")
     first_name = html.escape(update.effective_user.first_name if update.effective_user else "User")
+    india_now = datetime.now(ZoneInfo("Asia/Kolkata"))
+    current_date = india_now.strftime("%d %B %Y")
+    current_minutes = india_now.hour * 60 + india_now.minute
+    opening_minutes = 10 * 60
+    closing_minutes = 21 * 60 + 30
+
+    if opening_minutes <= current_minutes <= closing_minutes:
+        availability_text = "✅ <b>Service Available</b>"
+    else:
+        availability_text = "🌙 <b>Come Back Again Tomorrow at 10:00 AM</b>"
+
     text = (
         f"👋 <b>Hello {first_name}!</b>\n\n"
         "🎉 <b>Welcome to India Business Wallets</b>\n\n"
         "💳 Business Wallet Services\n"
-        "📝 Apply Now & Track Status\n\n"
+        "📝 Apply Now & Track Status\n"
+        "🕙 <b>Business Working Time:</b> 10:00 AM to 9:30 PM\n"
+        f"{availability_text}\n"
+        f"📅 <b>Date:</b> {current_date}\n\n"
         "Neeche diye gaye button se service select karein 👇"
     )
     if update.callback_query:
