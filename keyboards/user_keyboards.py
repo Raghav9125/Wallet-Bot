@@ -48,19 +48,35 @@ def whatsapp_button(link: str, message: str | None = None) -> InlineKeyboardMark
 def support_contact_buttons(whatsapp_link: str, support_email: str) -> InlineKeyboardMarkup:
     email = (support_email or "").strip()
     rows = [
-        [InlineKeyboardButton("💬 Contact Directly on WhatsApp", url=whatsapp_link)]
+        [
+            InlineKeyboardButton(
+                "💬 Contact Directly on WhatsApp",
+                url=whatsapp_link,
+            )
+        ]
     ]
-    if email and email.lower() != "not set":
+
+    if email and email.lower() not in {"not set", "support@example.com"}:
         subject = quote("India Business Wallet Support")
-        body = quote("Hello, I need help with India Business Wallet services.")
+        body = quote(
+            "Hello, I need help with India Business Wallet services."
+        )
+        gmail_url = (
+            "https://mail.google.com/mail/"
+            f"?view=cm&fs=1&to={quote(email)}&su={subject}&body={body}"
+        )
         rows.append(
             [
                 InlineKeyboardButton(
                     "📧 Contact Support by Email",
-                    url=f"mailto:{email}?subject={subject}&body={body}",
+                    url=gmail_url,
                 )
             ]
         )
+
+    rows.append(
+        [InlineKeyboardButton("⬅️ Back to Home", callback_data="user:home")]
+    )
     return InlineKeyboardMarkup(rows)
 
 def cancel_keyboard() -> InlineKeyboardMarkup:
