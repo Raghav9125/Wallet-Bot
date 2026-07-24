@@ -41,18 +41,33 @@ def _db(context: ContextTypes.DEFAULT_TYPE) -> Database:
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     db = _db(context)
     channel = db.get_setting("channel_link", "https://t.me/")
+    image = db.get_setting("welcome_image_file_id", "")
+    first_name = html.escape(update.effective_user.first_name if update.effective_user else "User")
     text = (
-        "👋 <b>Welcome to India Business Wallet</b>\n\n"
-        "Business wallet service ke liye neeche se option select karein."
+        f"馃憢 <b>Hello {first_name}!</b>\n\n"
+        "馃帀 <b>Welcome to India Business Wallets</b>\n\n"
+        "馃挸 Business Wallet Services\n"
+        "馃摑 Apply Now & Track Status\n\n"
+        "Neeche diye gaye button se service select karein 馃憞"
     )
-    if update.message:
-        await update.message.reply_text(
-            text, parse_mode=ParseMode.HTML, reply_markup=main_menu(channel)
-        )
-    else:
-        await update.callback_query.edit_message_text(
-            text, parse_mode=ParseMode.HTML, reply_markup=main_menu(channel)
-        )
+    if update.callback_query:
+        try:
+            await update.callback_query.delete_message()
+        except Exception:
+            pass
+    if image:
+        try:
+            await context.bot.send_photo(
+                chat_id=update.effective_chat.id, photo=image, caption=text,
+                parse_mode=ParseMode.HTML, reply_markup=main_menu(channel)
+            )
+            return
+        except Exception:
+            pass
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id, text=text,
+        parse_mode=ParseMode.HTML, reply_markup=main_menu(channel)
+    )
 
 
 async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -65,9 +80,9 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await start(update, context)
 
     if data == "user:apply":
-        services = db.list_services()
+        services = db.list_services(active_only=False)
         await query.edit_message_text(
-            "💼 <b>Aap kaunsa Business Wallet open karna chahte hain?</b>",
+            "馃捈 <b>Aap kaunsa Business Wallet open karna chahte hain?</b>",
             parse_mode=ParseMode.HTML,
             reply_markup=services_menu(services),
         )
@@ -77,7 +92,7 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         link = db.get_setting("whatsapp_link", "https://wa.me/")
         support_text = html.escape(db.get_setting("support_text"))
         await query.edit_message_text(
-            f"💬 <b>Support</b>\n\n{support_text}",
+            f"馃挰 <b>Support</b>\n\n{support_text}",
             parse_mode=ParseMode.HTML,
             reply_markup=whatsapp_button(link),
         )
@@ -91,13 +106,13 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=main_menu(db.get_setting("channel_link")),
             )
             return
-        lines = ["🔍 <b>Your Applications</b>\n"]
+        lines = ["馃攳 <b>Your Applications</b>\n"]
         for app in apps:
             status = STATUS_LABELS.get(app["status"], app["status"])
             lines.append(
                 f"<b>{html.escape(app['application_no'])}</b>\n"
                 f"Service: {html.escape(app['service_name'])}\n"
-                f"Amount: ₹{app['amount']}\n"
+                f"Amount: 鈧箋app['amount']}\n"
                 f"Status: {status}\n"
             )
         await query.edit_message_text(
@@ -111,14 +126,21 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         code = data.split(":", 1)[1]
         service = db.get_service(code)
         if not service:
-            await query.edit_message_text("Service abhi available nahi hai.")
+            await query.edit_message_text("Service nahi mili.")
+            return
+        if not service["active"]:
+            await query.edit_message_text(
+                f"鉂� <b>{html.escape(service['name'])}</b> abhi available nahi hai.\n\nSupport se contact karein.",
+                parse_mode=ParseMode.HTML,
+                reply_markup=whatsapp_button(db.get_setting("whatsapp_link", "https://wa.me/")),
+            )
             return
         docs = GOOGLE_DOCS if code == "google_pay" else COMMON_DOCS
-        doc_text = "\n".join(f"• {html.escape(item)}" for item in docs)
+        doc_text = "\n".join(f"鈥� {html.escape(item)}" for item in docs)
         await query.edit_message_text(
-            f"💳 <b>{html.escape(service['name'])}</b>\n\n"
+            f"馃挸 <b>{html.escape(service['name'])}</b>\n\n"
             f"<b>Required Documents:</b>\n{doc_text}\n\n"
-            f"<b>Service Charge:</b> ₹{service['price']}\n\n"
+            f"<b>Service Charge:</b> 鈧箋service['price']}\n\n"
             "Payment karne se pehle details dhyan se padh lein.",
             parse_mode=ParseMode.HTML,
             reply_markup=understood_menu(code),
@@ -127,9 +149,9 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data.startswith("understood:"):
         code = data.split(":", 1)[1]
-        service = db.get_service(code)
+        service = db.get_service(code, active_only=True)
         if not service:
-            await query.edit_message_text("Service abhi available nahi hai.")
+            await query.edit_message_text("鉂� Ye service abhi available nahi hai.")
             return ConversationHandler.END
 
         context.user_data["service_code"] = code
@@ -140,9 +162,9 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         upi_id = html.escape(db.get_setting("upi_id", "Not set"))
         payment_name = html.escape(db.get_setting("payment_name", "India Business Wallet"))
         caption = (
-            f"💳 <b>Payment Details</b>\n\n"
+            f"馃挸 <b>Payment Details</b>\n\n"
             f"Service: {html.escape(service['name'])}\n"
-            f"Amount: ₹{service['price']}\n"
+            f"Amount: 鈧箋service['price']}\n"
             f"UPI ID: <code>{upi_id}</code>\n"
             f"Account Name: {payment_name}\n\n"
             "Payment complete karne ke baad receipt ka clear screenshot bhejein."
@@ -164,7 +186,7 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await context.bot.send_message(
                 chat_id=query.message.chat_id,
-                text=caption + "\n\n⚠️ Admin ne QR code abhi set nahi kiya hai.",
+                text=caption + "\n\n鈿狅笍 Admin ne QR code abhi set nahi kiya hai.",
                 parse_mode=ParseMode.HTML,
                 reply_markup=cancel_keyboard(),
             )
@@ -191,7 +213,7 @@ async def receive_receipt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     context.user_data["receipt_file_id"] = update.message.photo[-1].file_id
     await update.message.reply_text(
-        "✅ Receipt mil gayi.\n\nAb payment ka UTR/Transaction Reference Number bhejein.",
+        "鉁� Receipt mil gayi.\n\nAb payment ka UTR/Transaction Reference Number bhejein.",
         reply_markup=cancel_keyboard(),
     )
     return WAITING_UTR
@@ -202,14 +224,14 @@ async def receive_utr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     raw = (update.message.text or "").strip()
     if not is_valid_utr(raw):
         await update.message.reply_text(
-            "UTR invalid lag raha hai. 6–30 letters/numbers ka valid UTR bhejein."
+            "UTR invalid lag raha hai. 6鈥�30 letters/numbers ka valid UTR bhejein."
         )
         return WAITING_UTR
 
     utr = normalize_utr(raw)
     if db.application_exists_by_utr(utr):
         await update.message.reply_text(
-            "❌ Ye UTR pehle hi submit ho chuka hai. Kripya payment verify karke sahi UTR bhejein."
+            "鉂� Ye UTR pehle hi submit ho chuka hai. Kripya payment verify karke sahi UTR bhejein."
         )
         return WAITING_UTR
 
@@ -235,10 +257,10 @@ async def receive_utr(update: Update, context: ContextTypes.DEFAULT_TYPE):
     app = db.get_application(app_no)
 
     await update.message.reply_text(
-        "✅ <b>Application successfully submitted</b>\n\n"
+        "鉁� <b>Application successfully submitted</b>\n\n"
         f"Application ID: <code>{app_no}</code>\n"
         f"Service: {html.escape(app['service_name'])}\n"
-        f"Amount: ₹{app['amount']}\n"
+        f"Amount: 鈧箋app['amount']}\n"
         f"Status: {STATUS_LABELS['PAYMENT_PENDING']}\n\n"
         "Verification ke baad status update kiya jayega.",
         parse_mode=ParseMode.HTML,
@@ -250,13 +272,13 @@ async def receive_utr(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     username = f"@{user.username}" if user.username else "Not available"
     admin_caption = (
-        "🆕 <b>New Payment Application</b>\n\n"
+        "馃啎 <b>New Payment Application</b>\n\n"
         f"Application: <code>{app_no}</code>\n"
         f"User: {html.escape(user.full_name)}\n"
         f"Username: {html.escape(username)}\n"
         f"User ID: <code>{user.id}</code>\n"
         f"Service: {html.escape(app['service_name'])}\n"
-        f"Amount: ₹{app['amount']}\n"
+        f"Amount: 鈧箋app['amount']}\n"
         f"UTR: <code>{html.escape(utr)}</code>\n"
         f"Status: {STATUS_LABELS['PAYMENT_PENDING']}"
     )
