@@ -3,7 +3,16 @@ from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes, ConversationHandler
 from database import Database
-from keyboards.admin_keyboards import admin_menu, application_actions, price_services_menu, availability_services_menu, payment_settings_menu, final_wallets_menu, final_wallet_setting_menu
+from keyboards.admin_keyboards import (
+    admin_menu,
+    application_actions,
+    price_services_menu,
+    availability_services_menu,
+    payment_settings_menu,
+    final_wallets_menu,
+    final_wallet_setting_menu,
+    delete_confirmation_menu,
+)
 from keyboards.user_keyboards import final_payment_button
 from utils.constants import STATUS_LABELS
 
@@ -67,6 +76,125 @@ async def admin_callback(update,context):
             photo=a['final_receipt_file_id'] if a['status']=='FINAL_PAYMENT_PENDING' and a['final_receipt_file_id'] else a['first_receipt_file_id'] or a['receipt_file_id']
             await context.bot.send_photo(q.message.chat_id,photo,caption=cap,parse_mode=ParseMode.HTML,reply_markup=application_actions(a['application_no'],a['status']))
         return ConversationHandler.END
+    if data.startswith('admin:deleteask:'):
+        app_no = data.split(':', 2)[2]
+        app = db.get_application(app_no)
+        if not app:
+            await context.bot.send_message(
+                q.message.chat_id,
+                '❌ Application record nahi mila.',
+            )
+            return ConversationHandler.END
+
+        warning = (
+            '⚠️ <b>Permanent Delete Confirmation</b>\n\n'
+            f'Application ID: <code>{html.escape(app_no)}</code>\n'
+            f'Service: {html.escape(app["service_name"])}\n'
+            f'User: {html.escape(app["full_name"])}\n\n'
+            'Is record ko delete karne ke baad yah <b>All</b>, '
+            '<b>Pending</b> aur user application history se hamesha ke liye '
+            'hat jayega. Is action ko undo nahi kiya ja sakta.'
+        )
+
+        try:
+            if q.message.photo:
+                await q.edit_message_caption(
+                    caption=warning,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=delete_confirmation_menu(app_no),
+                )
+            else:
+                await q.edit_message_text(
+                    warning,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=delete_confirmation_menu(app_no),
+                )
+        except Exception:
+            await context.bot.send_message(
+                q.message.chat_id,
+                warning,
+                parse_mode=ParseMode.HTML,
+                reply_markup=delete_confirmation_menu(app_no),
+            )
+        return ConversationHandler.END
+
+    if data.startswith('admin:deletecancel:'):
+        app_no = data.split(':', 2)[2]
+        app = db.get_application(app_no)
+        if not app:
+            await context.bot.send_message(
+                q.message.chat_id,
+                '❌ Application record nahi mila.',
+            )
+            return ConversationHandler.END
+
+        caption = (
+            f"<b>{html.escape(app['application_no'])}</b>\n"
+            f"User: {html.escape(app['full_name'])}\n"
+            f"Service: {html.escape(app['service_name'])}\n"
+            f"Total: ₹{app['amount']}\n"
+            f"First: ₹{app['first_amount']}\n"
+            f"Remaining: ₹{app['remaining_amount']}\n"
+            f"Status: {STATUS_LABELS.get(app['status'], app['status'])}"
+        )
+
+        try:
+            if q.message.photo:
+                await q.edit_message_caption(
+                    caption=caption,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=application_actions(
+                        app_no,
+                        app['status'],
+                    ),
+                )
+            else:
+                await q.edit_message_text(
+                    caption,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=application_actions(
+                        app_no,
+                        app['status'],
+                    ),
+                )
+        except Exception:
+            await context.bot.send_message(
+                q.message.chat_id,
+                '❎ Delete cancelled.',
+                reply_markup=admin_menu(),
+            )
+        return ConversationHandler.END
+
+    if data.startswith('admin:deleteconfirm:'):
+        app_no = data.split(':', 2)[2]
+        deleted = db.delete_application(app_no)
+
+        if not deleted:
+            await context.bot.send_message(
+                q.message.chat_id,
+                '❌ Application record nahi mila ya pehle hi delete ho chuka hai.',
+                reply_markup=admin_menu(),
+            )
+            return ConversationHandler.END
+
+        try:
+            await q.delete_message()
+        except Exception:
+            pass
+
+        await context.bot.send_message(
+            q.message.chat_id,
+            (
+                '🗑 <b>Application Permanently Deleted</b>\n\n'
+                f'Application ID: <code>{html.escape(app_no)}</code>\n\n'
+                'Yah record ab All, Pending aur application history me '
+                'dobara nahi dikhega.'
+            ),
+            parse_mode=ParseMode.HTML,
+            reply_markup=admin_menu(),
+        )
+        return ConversationHandler.END
+
     if data.startswith('admin:requestfinal:'):
         app_no = data.split(':', 2)[2]
         app = db.get_application(app_no)
