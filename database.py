@@ -152,6 +152,15 @@ class Database:
     def get_application(self, app_no: str):
         with self.connect() as conn: return conn.execute('SELECT * FROM applications WHERE application_no=?',(app_no,)).fetchone()
 
+    def delete_application(self, app_no: str) -> bool:
+        """Permanently remove an application record from the bot database."""
+        with self.connect() as conn:
+            cur = conn.execute(
+                'DELETE FROM applications WHERE application_no=?',
+                (app_no,),
+            )
+            return cur.rowcount > 0
+
     def get_user_applications(self, user_id:int, limit:int=10):
         with self.connect() as conn: return conn.execute('SELECT * FROM applications WHERE user_id=? ORDER BY id DESC LIMIT ?',(user_id,limit)).fetchall()
 
