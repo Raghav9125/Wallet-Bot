@@ -41,13 +41,96 @@ def final_wallet_setting_menu(code:str, name:str):
         [InlineKeyboardButton('⬅️ Wallet List', callback_data='admin:final_wallets')],
     ])
 
-def application_actions(app_no:str, status:str):
-    rows=[]
-    if status=='FIRST_PAYMENT_PENDING':
-        rows.append([InlineKeyboardButton('✅ Approve First Payment', callback_data=f'admin:status:{app_no}:FIRST_PAYMENT_APPROVED'), InlineKeyboardButton('❌ Reject', callback_data=f'admin:reject:{app_no}')])
-    if status in {'FIRST_PAYMENT_APPROVED','DOCUMENTS_PENDING','PROCESSING'}:
-        rows.append([InlineKeyboardButton('📄 Documents Pending', callback_data=f'admin:status:{app_no}:DOCUMENTS_PENDING'), InlineKeyboardButton('🔄 Processing', callback_data=f'admin:status:{app_no}:PROCESSING')])
-        rows.append([InlineKeyboardButton('🎉 Service Ready – Request Final Payment', callback_data=f'admin:requestfinal:{app_no}')])
-    if status=='FINAL_PAYMENT_PENDING':
-        rows.append([InlineKeyboardButton('✅ Approve Final Payment', callback_data=f'admin:status:{app_no}:SUCCESS'), InlineKeyboardButton('❌ Reject', callback_data=f'admin:reject:{app_no}')])
-    return InlineKeyboardMarkup(rows or [[InlineKeyboardButton('⬅️ Admin Home', callback_data='admin:home')]])
+def application_actions(app_no: str, status: str):
+    rows = []
+
+    if status == 'FIRST_PAYMENT_PENDING':
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    '✅ Approve First Payment',
+                    callback_data=f'admin:status:{app_no}:FIRST_PAYMENT_APPROVED',
+                ),
+                InlineKeyboardButton(
+                    '❌ Reject',
+                    callback_data=f'admin:reject:{app_no}',
+                ),
+            ]
+        )
+
+    if status in {
+        'FIRST_PAYMENT_APPROVED',
+        'DOCUMENTS_PENDING',
+        'PROCESSING',
+    }:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    '📄 Documents Pending',
+                    callback_data=f'admin:status:{app_no}:DOCUMENTS_PENDING',
+                ),
+                InlineKeyboardButton(
+                    '🔄 Processing',
+                    callback_data=f'admin:status:{app_no}:PROCESSING',
+                ),
+            ]
+        )
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    '🎉 Service Ready – Request Final Payment',
+                    callback_data=f'admin:requestfinal:{app_no}',
+                )
+            ]
+        )
+
+    if status == 'FINAL_PAYMENT_PENDING':
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    '✅ Approve Final Payment',
+                    callback_data=f'admin:status:{app_no}:SUCCESS',
+                ),
+                InlineKeyboardButton(
+                    '❌ Reject',
+                    callback_data=f'admin:reject:{app_no}',
+                ),
+            ]
+        )
+
+    rows.append(
+        [
+            InlineKeyboardButton(
+                '🗑 Delete Permanently',
+                callback_data=f'admin:deleteask:{app_no}',
+            )
+        ]
+    )
+    rows.append(
+        [
+            InlineKeyboardButton(
+                '⬅️ Admin Home',
+                callback_data='admin:home',
+            )
+        ]
+    )
+    return InlineKeyboardMarkup(rows)
+
+
+def delete_confirmation_menu(app_no: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton(
+                    '✅ Yes, Delete Permanently',
+                    callback_data=f'admin:deleteconfirm:{app_no}',
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    '❌ Cancel Delete',
+                    callback_data=f'admin:deletecancel:{app_no}',
+                )
+            ],
+        ]
+    )
